@@ -1,0 +1,17 @@
+{
+    "name": "com.kannmu.mauh",
+    "version": "0.0.1",
+    "displayName": "MAUH Driver",
+    "description": "Provides an interface to communicate with the MAUH haptic device via serial port.",
+    "keywords": [
+        "MAUH",
+        "Haptic",
+        "Driver"
+    ],
+    "unity": "2022.3",
+    "author": {
+        "name": "Kannmu",
+        "email": "kannmu@163.com",
+        "url": "https://www.kannmu.top"
+    }
+}
