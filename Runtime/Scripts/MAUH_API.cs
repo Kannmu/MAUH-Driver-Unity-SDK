@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System.IO.Ports;
 
 namespace MAUH
 {
@@ -9,12 +8,18 @@ namespace MAUH
     {
         public static bool IsConnected => MAUH_Manager.Instance != null && MAUH_Manager.Instance.IsConnected;
 
-        public static void SetPortAndBaudRate(string portName, int baudRate)
+        /// <summary>
+        /// Manually connect to the MAUH device through specified port name and baud rate. Usually unnecessary because the device will connect automatically when it is detected. 
+        /// Baud rate must be one of 9600, 19200, 38400, 57600, 115200.
+        /// </summary>
+        /// <param name="portName"></param>
+        /// <param name="baudRate"></param>
+        public static void Connect(string portName, int baudRate)
         {
-            MAUH_Manager.Instance.mauh_serial.PortName = portName;
-            MAUH_Manager.Instance.mauh_serial.BaudRate = baudRate;
+            MAUH_Manager.Instance.Connect(portName, baudRate);
         }
 
+        
 
     }
 }
