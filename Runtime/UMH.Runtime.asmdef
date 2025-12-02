@@ -1,6 +1,6 @@
 {
-    "name": "MAUH.Runtime",
-    "rootNamespace": "MAUH",
+    "name": "UMH.Runtime",
+    "rootNamespace": "UMH",
     "references": [],
     "includePlatforms": [
         "Editor",

@@ -1,6 +1,6 @@
-# MAUH Driver
+# UMH Driver
 
-Provides an interface to communicate with the MAUH haptic device via serial port.
+Provides an interface to communicate with the UMH haptic device via serial port.
 
 ## Usage
 

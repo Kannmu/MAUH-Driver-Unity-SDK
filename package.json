@@ -1,10 +1,10 @@
 {
-    "name": "com.kannmu.mauh",
+    "name": "com.kannmu.umh",
     "version": "0.0.1",
-    "displayName": "MAUH Driver",
-    "description": "Provides an interface to communicate with the MAUH haptic device via serial port.",
+    "displayName": "UMH Driver",
+    "description": "Provides an interface to communicate with the UMH haptic device via serial port.",
     "keywords": [
-        "MAUH",
+        "UMH",
         "Haptic",
         "Driver"
     ],
