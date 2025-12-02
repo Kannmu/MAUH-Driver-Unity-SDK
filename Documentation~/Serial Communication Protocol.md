@@ -19,7 +19,7 @@
 - Command/Msg Type
   - PC -> MAUH (Command)
     - 0x01: Point Info (Get or set information of a specific point)
-    - 0x02: Enable/Disable (Enable or disable a certain function)
+    - 0x02: Enable/Disable (Enable or disable the device)
     - 0x03: GetStatus (Get device status)
     - 0x04: Ping (Used for connection test and automatic serial port recognition)
   - MAUH -> PC (Response)

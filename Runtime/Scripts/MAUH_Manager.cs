@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Threading.Tasks;
 using System.IO.Ports;
 
 namespace MAUH
@@ -13,11 +14,7 @@ namespace MAUH
 
         [NonSerialized] public MAUH_Serial mauh_serial;
 
-        [NonSerialized] public float pollingInterval = 0.1f; // 100ms轮询间隔
-
         [NonSerialized] public System.Action<byte[]> OnDataReceived; // 数据接收事件
-
-        private Coroutine pollingCoroutine;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void InitializeOnLoad()
@@ -29,7 +26,6 @@ namespace MAUH
 
             GameObject managerObject = new GameObject("[MAUH_SerialManager]");
             Instance = managerObject.AddComponent<MAUH_Manager>();
-
             managerObject.hideFlags = HideFlags.HideInHierarchy;
         }
 
@@ -47,87 +43,62 @@ namespace MAUH
             }
 
             mauh_serial = new MAUH_Serial();
-            StartCoroutine(FindDevicePortName());
+
+            // 订阅帧接收事件
+            mauh_serial.OnFrameReceived += OnFrameReceived;
+
             Debug.Log("MAUH Device Initialized Successfully.");
         }
 
-        private void Start()
+        private async Task Start()
         {
-            
+            // 启动设备查找
+            // _ = FindDevicePortNameAsync();
+
+            Connect("COM4", 115200);
+            await SendCommandAsync(MAUH_Serial.CommandType.Ping, new byte[] { (byte)UnityEngine.Random.Range(0, 256) }, 0);
         }
 
-        private IEnumerator FindDevicePortName()
+        private void Update()
+        {
+
+        }
+
+        /// <summary>
+        /// 当接收到完整帧时的处理方法
+        /// </summary>
+        /// <param name="frame">接收到的完整帧数据</param>
+        private void OnFrameReceived(byte[] frame)
+        {
+            OnDataReceived?.Invoke(frame);
+            ProcessReceivedData(frame);
+        }
+
+        /// <summary>
+        /// 异步查找设备端口名称
+        /// </summary>
+        private async Task FindDevicePortNameAsync()
         {
             string[] portNames = SerialPort.GetPortNames();
+
+            // Reverse portNames array for fast connection attempt(because the last connected port is usually the one we want)
+            Array.Reverse(portNames);
+
+            if (portNames == null)
+            {
+                Debug.LogError("Failed to get serial port names.");
+                return;
+            }
+
             Debug.Log($"Available ports num: {portNames.Length}, ports: {string.Join(", ", portNames)}");
 
             if (portNames.Length == 0)
             {
                 Debug.LogError("No serial ports available.");
-                yield break;
+                return;
             }
 
-            foreach (string port in portNames)
-            {
-                string portName = mauh_serial.AttemptToConnectToPort(port);
-                if (portName != null)
-                {
-                    Debug.Log($"Connected to MAUH device on port: {portName}");
-                    if (IsConnected)
-                    {
-                        StartPolling();
-                    }
-                    yield break;
-                }
-            }
-        }
-
-
-
-        public void StartPolling()
-        {
-            if (pollingCoroutine != null)
-            {
-                StopCoroutine(pollingCoroutine);
-            }
-            pollingCoroutine = StartCoroutine(PollingCoroutine());
-        }
-
-        public void StopPolling()
-        {
-            if (pollingCoroutine != null)
-            {
-                StopCoroutine(pollingCoroutine);
-                pollingCoroutine = null;
-            }
-        }
-
-        private IEnumerator PollingCoroutine()
-        {
-            while (IsConnected)
-            {
-                try
-                {
-                    // 使用非阻塞方式检查数据
-                    byte[] receivedData = mauh_serial.TryReadFrame();
-
-                    if (receivedData != null)
-                    {
-                        // 触发数据接收事件
-                        OnDataReceived?.Invoke(receivedData);
-
-                        // 处理接收到的数据
-                        ProcessReceivedData(receivedData);
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"轮询过程中发生错误: {ex.Message}");
-                }
-
-                // 等待下一次轮询
-                yield return new WaitForSeconds(pollingInterval);
-            }
+            Connect("COM4", 115200);
         }
 
         private void ProcessReceivedData(byte[] frame)
@@ -149,7 +120,7 @@ namespace MAUH
                         Debug.Log("收到状态返回");
                         break;
                     case MAUH_Serial.ResponseType.Ping_ACK:
-                        Debug.Log("收到Ping ACK");
+                        Debug.Log("收到Ping ACK" + BitConverter.ToString(frame));
                         break;
                     case MAUH_Serial.ResponseType.Error:
                         Debug.LogError("收到错误响应");
@@ -158,42 +129,54 @@ namespace MAUH
             }
         }
 
-
         public void Connect(string portName, int baudRate)
         {
             mauh_serial.PortName = portName;
             mauh_serial.BaudRate = baudRate;
-            if (mauh_serial.Connect())
-            {
-                StartPolling();
-            }
+            mauh_serial.Connect();
         }
 
+        /// <summary>
+        /// 异步发送命令
+        /// </summary>
+        /// <param name="cmd">命令类型</param>
+        /// <param name="data">数据负载</param>
+        /// <param name="timeout">超时时间</param>
+        /// <returns>发送是否成功</returns>
+        public async Task<bool> SendCommandAsync(MAUH_Serial.CommandType cmd, byte[] data = null, int timeout = 300)
+        {
+            return await mauh_serial.SendFrameAsync(cmd, data, timeout);
+        }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        /// <summary>
+        /// 同步发送命令（为了向后兼容）
+        /// </summary>
+        /// <param name="cmd">命令类型</param>
+        /// <param name="data">数据负载</param>
+        /// <param name="timeout">超时时间</param>
+        /// <returns>发送是否成功</returns>
+        public bool SendCommand(MAUH_Serial.CommandType cmd, byte[] data = null, int timeout = 300)
+        {
+            return mauh_serial.SendFrame(cmd, data, timeout);
+        }
 
         private void OnDestroy()
         {
-            mauh_serial?.Dispose();
+            if (mauh_serial != null)
+            {
+                mauh_serial.OnFrameReceived -= OnFrameReceived;
+                mauh_serial.Dispose();
+            }
             Instance = null;
         }
+
         private void OnApplicationQuit()
         {
-            mauh_serial?.Dispose();
+            if (mauh_serial != null)
+            {
+                mauh_serial.OnFrameReceived -= OnFrameReceived;
+                mauh_serial.Dispose();
+            }
         }
     }
 }
