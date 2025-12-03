@@ -28,7 +28,7 @@ namespace UMH
 
         public enum CommandType : byte
         {
-            PointInfo = 0x01,
+            SetPoint = 0x01,
             EnableDisable = 0x02,
             GetStatus = 0x03,
             Ping = 0x04

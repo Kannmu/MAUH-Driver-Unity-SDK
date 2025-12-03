@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO.Ports;
 using System.Threading.Tasks;
@@ -13,6 +14,8 @@ namespace UMH
         public bool IsConnected => _serial != null && _serial.IsConnected;
         
         public event Action<byte[]> OnDataReceived;
+        public event Action<UMH_Device_Status> OnStatusReceived;
+        public event Action<byte> OnErrorReceived;
 
         private UMH_Serial _serial;
         private readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
@@ -44,12 +47,18 @@ namespace UMH
             }
 
             _serial = new UMH_Serial();
+            
+            _serial.OnFrameReceived -= HandleFrameReceived;
             _serial.OnFrameReceived += HandleFrameReceived;
+
+            OnStatusReceived -= UMH_API.HandleStatusUpdate;
+            OnStatusReceived += UMH_API.HandleStatusUpdate;
         }
 
         private void Start()
         {
             _ = ScanAndConnectAsync();
+            StartCoroutine(GetStatusCoroutine());
         }
 
         private void Update()
@@ -93,13 +102,88 @@ namespace UMH
             if (frame.Length < 4) return;
             
             UMH_Serial.ResponseType type = (UMH_Serial.ResponseType)frame[2];
+            byte dataLen = frame[3];
+            byte[] payload = null;
+            
+            if (dataLen > 0 && frame.Length >= 7 + dataLen)
+            {
+                payload = new byte[dataLen];
+                Array.Copy(frame, 4, payload, 0, dataLen);
+            }
+
             switch (type)
             {
+                case UMH_Serial.ResponseType.ACK:
+                    Debug.Log($"[UMH] Command Acknowledged (ACK) at {DateTime.Now:HH:mm:ss.fff}");
+                    break;
+                case UMH_Serial.ResponseType.NACK:
+                    Debug.LogWarning($"[UMH] Command Not Acknowledged (NACK) at {DateTime.Now:HH:mm:ss.fff}");
+                    break;
+                case UMH_Serial.ResponseType.ReturnStatus:
+                    if (payload != null && payload.Length > 0)
+                    {
+                        UMH_Device_Status newStatus = new UMH_Device_Status();
+                        int offset = 0;
+                        newStatus.Voltage = BitConverter.ToSingle(payload[offset..(offset += 4)]);
+                        newStatus.Temperature = BitConverter.ToSingle(payload[offset..(offset += 4)]);
+                        OnStatusReceived?.Invoke(newStatus);
+                        Debug.Log($"<color=lightgray>[UMH] Status Received: Voltage={newStatus.Voltage:F2}V, Temperature={newStatus.Temperature:F1}°C at {DateTime.Now:HH:mm:ss.fff}</color>");
+                    }
+                    break;
                 case UMH_Serial.ResponseType.Ping_ACK:
-                    Debug.Log($"Ping ACK received: {frame[4]}");
+                    // Ping ACK is mainly used for connection verification in ScanAndConnectAsync
+                    // But we can log it here if needed
+                    break;
+                case UMH_Serial.ResponseType.Error:
+                    if (payload != null && payload.Length > 0)
+                    {
+                        OnErrorReceived?.Invoke(payload[0]);
+                        Debug.LogError($"[UMH] Error Received: Code {payload[0]:X2}");
+                    }
                     break;
             }
         }
+
+        #region Protocol Commands
+
+        /// <summary>
+        /// Command 0x01: Point Info
+        /// </summary>
+        public async Task SetPointAsync(byte[] data)
+        {
+            await SendCommandAsync(UMH_Serial.CommandType.SetPoint, data);
+        }
+
+        /// <summary>
+        /// Command 0x02: Enable/Disable
+        /// </summary>
+        /// <param name="enable">true to enable, false to disable</param>
+        public async Task SetEnableAsync(bool enable)
+        {
+            byte val = enable ? (byte)0x01 : (byte)0x00;
+            await SendCommandAsync(UMH_Serial.CommandType.EnableDisable, new byte[] { val });
+        }
+
+        /// <summary>
+        /// Command 0x03: GetStatus
+        /// </summary>
+        public async void GetStatusAsync()
+        {
+            await SendCommandAsync(UMH_Serial.CommandType.GetStatus);
+        }
+
+        #endregion
+
+        private IEnumerator GetStatusCoroutine()
+        {
+            yield return new WaitForSeconds(1f);
+            while (UMH_API.IsConnected)
+            {
+                UMH_API.GetStatus();
+                yield return new WaitForSeconds(1f);
+            }
+        }
+
 
         private async Task ScanAndConnectAsync()
         {
@@ -118,19 +202,26 @@ namespace UMH
 
             foreach (var port in ports)
             {
-                tasks.Add(Task.Run(async () => 
+                tasks.Add(Task.Run(async () =>
                 {
-                    var serial = new UMH_Serial();
-                    if (await CheckPort(serial, port))
+                    try
                     {
-                        if (!tcs.TrySetResult(serial))
+                        var serial = new UMH_Serial();
+                        if (await CheckPort(serial, port))
+                        {
+                            if (!tcs.TrySetResult(serial))
+                            {
+                                serial.Dispose();
+                            }
+                        }
+                        else
                         {
                             serial.Dispose();
                         }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        serial.Dispose();
+                        Debug.LogError($"Error scanning port {port}: {ex.Message}");
                     }
                 }));
             }
@@ -152,12 +243,14 @@ namespace UMH
 
             _isScanning = false;
         }
-
         private async Task<bool> CheckPort(UMH_Serial serial, string port)
         {
+            // Skip ports with "Bluetooth" in the name as requested
+            if (port.IndexOf("Bluetooth", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+
             if (!serial.Connect(port, 115200)) return false;
 
-            byte pingVal = (byte)UnityEngine.Random.Range(0, 255);
+            byte pingVal = (byte)new System.Random().Next(0, 255);
             var tcs = new TaskCompletionSource<bool>();
             
             Action<byte[]> handler = (frame) =>
@@ -173,7 +266,7 @@ namespace UMH
             serial.OnFrameReceived += handler;
             await serial.SendFrameAsync(UMH_Serial.CommandType.Ping, new byte[] { pingVal });
 
-            var task = await Task.WhenAny(tcs.Task, Task.Delay(100));
+            var task = await Task.WhenAny(tcs.Task, Task.Delay(200));
             serial.OnFrameReceived -= handler;
 
             return task == tcs.Task && tcs.Task.Result;

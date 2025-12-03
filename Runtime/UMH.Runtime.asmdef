@@ -1,7 +1,9 @@
 {
     "name": "UMH.Runtime",
     "rootNamespace": "UMH",
-    "references": [],
+    "references": [
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [
         "Editor",
         "WindowsStandalone64"
