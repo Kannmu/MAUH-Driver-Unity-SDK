@@ -38,8 +38,9 @@ namespace UMH
         {
             ACK = 0x80,
             NACK = 0x81,
-            ReturnStatus = 0x82,
-            Ping_ACK = 0x83,
+            PACK = 0x82,
+            ReturnStatus = 0x83,
+            Ping_ACK = 0x84,
             Error = 0xFF
         }
 

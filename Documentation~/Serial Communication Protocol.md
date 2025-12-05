@@ -1,7 +1,7 @@
 # Serial Communication Protocol
 
 ## Frame Format
- 
+
 | Field | Length (Bytes) | Description |
 |--------------|--------------|----------------------|
 | Frame Header | 2 | Fixed value used to mark the start of a data frame. |
@@ -19,15 +19,34 @@
 - Command/Msg Type
   - PC -> UMH (Command)
     - 0x01: SetPoint (Set information of a specific point)
+      - Payload:
+        - position: float[3]
+        - strength: float
+        - vibration: float[3]
+        - frequency: float
     - 0x02: Enable/Disable (Enable or disable the device)
+      - Payload:
+        - Enable: byte (0x00: Disable, 0x01: Enable)
     - 0x03: GetStatus (Get device status)
+      - Payload: None
     - 0x04: Ping (Used for connection test and automatic serial port recognition)
+      - Payload:
+        - Random Number: byte[1]
   - UMH -> PC (Response)
     - 0x80: ACK (General success response)
     - 0x81: NACK (General failure response)
-    - 0x82: Return Status (Return specific status, e.g., temperature)
-    - 0x83: Ping_ACK (Specific response to Ping command)
+    - 0x82: PACK (Point Sent)
+      - Payload:
+        - UpdateDeltaTime: double
+    - 0x83: Return Status (Return specific status, e.g., temperature)
+      - Payload:
+        - Voltage: float
+        - Temperature: float
+    - 0x84: Ping_ACK (Specific response to Ping command)
+      - Payload:
+        - Random Number: byte[1]
       - For the Ping command (0x04): The PC may send a random number as the data payload, and the UMH must return that same random number unchanged in the Ping_ACK (0x83) response to increase recognition reliability.
+
     - 0xFF: Error Code (Return detailed error code)
 - Data Length: unsigned char (1 byte)
   - Type: unsigned char (1 byte)
@@ -44,7 +63,6 @@
     - Bytes to checksum: [Command/Msg Type] [Data Length] [Data Payload]
     - That is: 0x04 + 0x00 = 0x04
     - The checksum byte is therefore 0x04.
-
 - Frame Tail: 0x0D 0x0A
   - Type: unsigned char (2 bytes)
   - Description: Fixed value used to mark the end of a data frame.

@@ -348,13 +348,25 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 950447656118692116, guid: a91a338005d4b154a819b8d79f75d5da, type: 3}
+      propertyPath: refreshRate
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 950447656118692116, guid: a91a338005d4b154a819b8d79f75d5da, type: 3}
+      propertyPath: uiUpdateRate
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 950447656118692116, guid: a91a338005d4b154a819b8d79f75d5da, type: 3}
+      propertyPath: getDeviceStatusRate
+      value: 20
+      objectReference: {fileID: 0}
     - target: {fileID: 3983299995091188758, guid: a91a338005d4b154a819b8d79f75d5da, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3983299995091188758, guid: a91a338005d4b154a819b8d79f75d5da, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.0095
       objectReference: {fileID: 0}
     - target: {fileID: 3983299995091188758, guid: a91a338005d4b154a819b8d79f75d5da, type: 3}
       propertyPath: m_LocalPosition.z
